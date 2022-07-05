@@ -4,17 +4,17 @@ import * as fs from "fs/promises";
 function getWebviewOptions(
   extensionContext: vscode.ExtensionContext
 ): vscode.WebviewOptions {
-  var localResourceRoots = [
-    vscode.Uri.joinPath(extensionContext.extensionUri, "media"),
-  ];
-  var workspaceFolders = vscode.workspace.workspaceFolders?.map((v) => v.uri);
-  if (workspaceFolders) {
-    localResourceRoots = localResourceRoots.concat(workspaceFolders);
-  }
+  // var localResourceRoots = [
+  //   vscode.Uri.joinPath(extensionContext.extensionUri, "web-vue", "dist"),
+  // ];
+  // var workspaceFolders = vscode.workspace.workspaceFolders?.map((v) => v.uri);
+  // if (workspaceFolders) {
+  //   localResourceRoots = localResourceRoots.concat(workspaceFolders);
+  // }
 
   return {
     enableScripts: true,
-    localResourceRoots,
+    // localResourceRoots,
   };
 }
 
@@ -35,11 +35,12 @@ export default class TestPanel {
 
     // If we already have a panel, show it.
     if (this.currentPanel?._panel) {
+      this.currentPanel.update();
       this.currentPanel._panel.reveal(column);
       return;
     }
 
-    // Otherwise, create a new panle.
+    // Otherwise, create a new panel.
     const panel = vscode.window.createWebviewPanel(
       this.viewType,
       "Test Panel",
@@ -66,7 +67,9 @@ export default class TestPanel {
     this._extensionContext = extensionContext;
     this._extensionUri = extensionContext.extensionUri;
 
-    this._update();
+    this._webview.options = getWebviewOptions(extensionContext);
+
+    this.update();
 
     this._panel.onDidDispose(
       () => this.dispose(),
@@ -77,7 +80,7 @@ export default class TestPanel {
     this._panel.onDidChangeViewState(
       (e) => {
         if (this._panel.visible) {
-          this._update();
+          this.update();
         }
       },
       null,
@@ -91,47 +94,37 @@ export default class TestPanel {
     this._panel.dispose();
   }
 
-  private async _update() {
+  public async update() {
     const panel = this._panel;
     const webview = this._panel.webview;
 
     panel.title = "Hello World";
-    webview.html = await this._getHtmlForWebview(webview);
+    webview.html = (await this._getHtmlForWebview()) ?? "";
   }
 
-  private async _getHtmlForWebview(webview: vscode.Webview) {
+  public async refreshHtmlForWebview() {
+    const htmlUri = vscode.Uri.joinPath(
+      this._extensionUri,
+      "web-vue",
+      "dist",
+      "index.html"
+    );
+    let html = await fs.readFile(htmlUri.fsPath, "utf8");
+    const baseUri = this._webview
+      .asWebviewUri(
+        vscode.Uri.joinPath(this._extensionUri, "web-vue", "dist", "/")
+      )
+      .toString();
+    html = html.replace("${baseUri}", baseUri);
+    this._cacheHTML = html;
+    return this._cacheHTML;
+  }
+
+  private async _getHtmlForWebview() {
     if (!this._cacheHTML) {
-      const htmlUri = vscode.Uri.joinPath(
-        this._extensionUri,
-        "media",
-        "index.html"
-      );
-      let html = await fs.readFile(htmlUri.fsPath, "utf8");
-      const baseUri = webview.asWebviewUri(
-        vscode.Uri.joinPath(this._extensionUri, "/")
-      );
-      html = html.replace("${baseUri}", baseUri.toString());
-      this._cacheHTML = html;
+      return await this.refreshHtmlForWebview();
     }
     return this._cacheHTML;
-    // return `
-    //   <!DOCTYPE html>
-    //   <html lang="en">
-    //   <head>
-    //     <base href="${baseUri}">
-    //     <meta charset="UTF-8">
-    //     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    //     <title>Test Panel</title>
-    //   </head>
-    //   <body>
-    //     <h1>Add Image</h1>
-    //     <input id="pathInput" />
-    //     <button id="addButton">Add Image</button>
-    //     <div id="imageList"></div>
-    //     <script src="media/main.js"></script>
-    //   </body>
-    //   </html>
-    // `;
   }
 
   public loadImage(uri: vscode.Uri) {

@@ -1,0 +1,10 @@
+{
+  "name": "test-layout",
+  "version": "1.0.0",
+  "main": "main.js",
+  "author": "Ali Jaya Meilio Lie",
+  "license": "MIT",
+  "dependencies": {
+    "@svgdotjs/svg.js": "^3.1.2"
+  }
+}
